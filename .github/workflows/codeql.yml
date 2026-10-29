@@ -8,20 +8,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  actions: read
   contents: read
   security-events: write
 
 jobs:
   analyze:
-    if: ${{ hashFiles('**/*.js', '**/*.jsx', '**/*.mjs', '**/*.cjs', '**/*.ts', '**/*.tsx') != '' }}
-    name: Analyze
+    name: Analyze JavaScript
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [javascript-typescript]
 
     steps:
       - name: Checkout repository
@@ -30,10 +23,7 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: ${{ matrix.language }}
-
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+          languages: javascript-typescript
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
