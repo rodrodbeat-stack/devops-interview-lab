@@ -93,3 +93,4 @@ terraform -chdir=terraform plan -input=false
 echo "=== LABORATORIO PREPARADO ==="
 terraform version
 aws --version
+
