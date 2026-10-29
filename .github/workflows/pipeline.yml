@@ -1,0 +1,110 @@
+name: DevSecOps Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  CODE:
+    name: CODE
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+  BUILD:
+    name: BUILD
+    needs: CODE
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t devsecops-lab:${{ github.sha }} .
+
+  TEST:
+    name: TEST
+    needs: BUILD
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check application
+        run: grep -q "DEVSECOPS LAB" app/index.html
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        working-directory: terraform
+        run: terraform validate
+
+  SECURITY:
+    name: SECURITY
+    needs: TEST
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init -backend=false
+
+      - name: Install Checkov
+        run: pip install checkov==3.4.0
+
+      - name: Checkov scan
+        run: checkov --directory terraform --framework terraform
+
+      - name: Build Docker image
+        run: docker build -t devsecops-lab:${{ github.sha }} .
+
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: devsecops-lab:${{ github.sha }}
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+
+  DEPLOY:
+    name: DEPLOY
+    needs: SECURITY
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t devsecops-lab:${{ github.sha }} .
+
+      - name: Start Nginx
+        run: docker run -d --name devsecops-web -p 8080:80 devsecops-lab:${{ github.sha }}
+
+      - name: Health check
+        run: |
+          for i in $(seq 1 10); do
+            if curl --fail http://localhost:8080; then
+              echo "DEPLOYMENT OK"
+              exit 0
+            fi
+            sleep 3
+          done
+          docker logs devsecops-web
+          exit 1
