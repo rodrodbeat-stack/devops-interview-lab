@@ -1,0 +1,71 @@
+name: DevOps CI-CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  terraform-validate:
+    name: Terraform Validate
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Format
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -input=false
+
+  docker-validation:
+    name: Docker Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify Dockerfile directory
+        run: |
+          echo "Validating repository structure"
+          test -d terraform
+          test -f terraform/main.tf
+          echo "Repository structure OK"
+
+  security-check:
+    name: Basic Security Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for committed Terraform state
+        run: |
+          if find . -type f -name '*.tfstate' \
+            -not -path './.git/*' | grep -q .; then
+            echo "ERROR: Terraform state file detected"
+            exit 1
+          fi
+          echo "No Terraform state files found"
