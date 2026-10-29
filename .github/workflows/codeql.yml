@@ -24,6 +24,12 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: javascript-typescript
+          queries: security-extended
+
+      - name: Build
+        run: |
+          test -s src/index.js
+          node --check src/index.js
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
